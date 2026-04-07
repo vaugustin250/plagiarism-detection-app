@@ -502,3 +502,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+#   A u t o - r e b u i l d   t r i g g e r  
+ 
