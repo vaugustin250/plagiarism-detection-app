@@ -19,6 +19,20 @@ load_dotenv()
 s3_client = boto3.client('s3')
 secrets_client = boto3.client('secretsmanager')
 
+# Generate pre-signed URL for S3 upload
+def generate_presigned_url(s3_key, bucket_name):
+    """Generate a pre-signed POST URL for S3 upload"""
+    try:
+        response = s3_client.generate_presigned_post(
+            Bucket=bucket_name,
+            Key=s3_key,
+            ExpiresIn=3600  # 1 hour
+        )
+        return response
+    except Exception as e:
+        print(f"Error generating pre-signed URL: {str(e)}")
+        return None
+
 # Get secrets
 def get_secret(secret_name):
     try:
@@ -275,25 +289,55 @@ def store_results_in_db(document_id, plagiarism_score, ai_score, similar_docs):
 # Main Lambda handler
 def lambda_handler(event, context):
     """
-    Main Lambda handler - supports both S3 events and API Gateway calls
-    
-    S3 Event format: event['Records'][0]['s3']['bucket']['name']
-    API Gateway format: event['s3_bucket'] and event['s3_key']
+    Main Lambda handler - supports:
+    1. S3 events (bucket/key in Records)
+    2. Pre-signed URL requests ({s3_key, filename})
+    3. Document analysis via API Gateway ({s3_key, filename})
     """
     try:
+        print(f"Received event: {json.dumps(event)}")
+        
+        # Check if this is a pre-signed URL request
+        if 's3_key' in event and 'filename' in event and 'Records' not in event:
+            # Check if it's just a presigned URL request (no bucket/key in original S3)
+            if 's3_bucket' not in event:
+                # This is a presigned URL request from Streamlit
+                print("Generating pre-signed URL request")
+                
+                bucket = os.getenv('S3_BUCKET_NAME')
+                s3_key = event['s3_key']
+                
+                presigned = generate_presigned_url(s3_key, bucket)
+                
+                if presigned:
+                    return {
+                        'statusCode': 200,
+                        'headers': {'Content-Type': 'application/json'},
+                        'body': json.dumps(presigned)
+                    }
+                else:
+                    return {
+                        'statusCode': 500,
+                        'headers': {'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Failed to generate presigned URL'})
+                    }
+        
         # Determine event source and extract bucket/key
+        bucket = os.getenv('S3_BUCKET_NAME')
+        
         if 'Records' in event:
             # S3 Event format
             bucket = event['Records'][0]['s3']['bucket']['name']
             key = event['Records'][0]['s3']['object']['key']
             print(f"Processing S3 event: s3://{bucket}/{key}")
-        elif 's3_bucket' in event and 's3_key' in event:
+        elif 's3_key' in event:
             # API Gateway/Direct format
-            bucket = event['s3_bucket']
             key = event['s3_key']
             print(f"Processing API Gateway request: s3://{bucket}/{key}")
         else:
-            raise Exception("Invalid event format. Expected S3 event or {s3_bucket, s3_key} format")
+            raise Exception("Invalid event format")
+        
+        filename = event.get('filename', key)
         
         # 1. Create document record
         conn = get_db_connection()
@@ -303,7 +347,7 @@ def lambda_handler(event, context):
             INSERT INTO documents (filename, s3_path, status)
             VALUES (%s, %s, %s)
             RETURNING id
-        """, (key, f"s3://{bucket}/{key}", 'processing'))
+        """, (filename, f"s3://{bucket}/{key}", 'processing'))
         
         document_id = cur.fetchone()[0]
         conn.commit()

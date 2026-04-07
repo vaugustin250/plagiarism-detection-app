@@ -1,34 +1,17 @@
 """
 Streamlit Web Dashboard - AI Plagiarism Detection
-Uploads files to S3, then calls Lambda API Gateway endpoint
+Uses Lambda-generated pre-signed URLs for S3 uploads (NO boto3 needed)
 """
 
 import streamlit as st
 import requests
-import boto3
 import json
 from datetime import datetime
 import os
 
 # API Configuration
 API_ENDPOINT = "https://uvwsd5vxgc.execute-api.us-east-2.amazonaws.com/prod/analyze"
-S3_BUCKET = "plagiarism-detection-docs-augustin"
-S3_REGION = "us-east-2"
-
-# AWS S3 Client with credentials from Streamlit Secrets
-@st.cache_resource
-def get_s3_client():
-    try:
-        # Try to use Streamlit Secrets (works on Streamlit Cloud)
-        return boto3.client(
-            's3',
-            region_name=S3_REGION,
-            aws_access_key_id=st.secrets.get("AWS_ACCESS_KEY_ID"),
-            aws_secret_access_key=st.secrets.get("AWS_SECRET_ACCESS_KEY")
-        )
-    except:
-        # Fall back to environment variables or IAM role
-        return boto3.client('s3', region_name=S3_REGION)
+PRESIGNED_URL_ENDPOINT = "https://uvwsd5vxgc.execute-api.us-east-2.amazonaws.com/prod/get-presigned-url"
 
 # Configure Streamlit page
 st.set_page_config(
@@ -46,24 +29,6 @@ st.markdown("""
 - 🤖 AI Detection: 81% Accuracy  
 - ⚡ Fast Processing: 30-60 seconds
 """)
-
-st.divider()
-
-# Configuration Check
-if not st.secrets.get("AWS_ACCESS_KEY_ID"):
-    st.warning("""
-    ⚠️ **AWS Credentials Not Configured**
-    
-    To use this app, add your AWS credentials to Streamlit Secrets:
-    
-    1. Go to **Settings** → **Secrets**
-    2. Add these variables:
-       - `AWS_ACCESS_KEY_ID`
-       - `AWS_SECRET_ACCESS_KEY`
-       - `AWS_DEFAULT_REGION`
-    
-    📖 See `STREAMLIT_SECRETS_SETUP.md` for detailed instructions
-    """, icon="⚠️")
 
 st.divider()
 
@@ -97,95 +62,128 @@ st.divider()
 # Analyze Button
 if uploaded_file:
     if st.button("🚀 Analyze Document", use_container_width=True):
-        with st.spinner("📤 Uploading to S3... then processing"):
-            try:
-                # Step 1: Upload file to S3
-                s3_key = f"submissions/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uploaded_file.name}"
-                s3_client = get_s3_client()
-                
-                st.info("📤 Uploading document to S3...")
-                s3_client.upload_fileobj(
-                    uploaded_file,
-                    S3_BUCKET,
-                    s3_key
-                )
-                st.success(f"✅ Uploaded to S3: {s3_key}")
-                
-                # Step 2: Call Lambda with S3 path (small request)
-                st.info("🔍 Analyzing document via Lambda...")
-                payload = {
-                    "s3_bucket": S3_BUCKET,
-                    "s3_key": s3_key,
-                    "filename": uploaded_file.name
-                }
-                
-                response = requests.post(
-                    API_ENDPOINT,
-                    json=payload,
-                    timeout=120,
-                    headers={"Content-Type": "application/json"}
-                )
-                
-                # Parse response
-                if response.status_code == 200:
-                    result = response.json()
-                    
-                    # Display Results
-                    st.success("✅ Analysis Complete!")
-                    
-                    # Create result display
-                    results_col1, results_col2, results_col3 = st.columns(3)
-                    
-                    with results_col1:
-                        plagiarism_score = float(result.get('plagiarism_score', 0))
-                        st.metric(
-                            "📊 Plagiarism Score",
-                            f"{plagiarism_score:.1f}%"
-                        )
-                        
-                        # Color indicator
-                        if plagiarism_score < 20:
-                            st.markdown('<div style="background-color: #ccffcc; padding: 10px; border-radius: 5px; color: #00cc00; font-weight: bold;">✅ Low Plagiarism</div>', unsafe_allow_html=True)
-                        elif plagiarism_score < 50:
-                            st.markdown('<div style="background-color: #fff4cc; padding: 10px; border-radius: 5px; color: #cc8800; font-weight: bold;">⚠️ Medium Plagiarism</div>', unsafe_allow_html=True)
-                        else:
-                            st.markdown('<div style="background-color: #ffcccc; padding: 10px; border-radius: 5px; color: #cc0000; font-weight: bold;">🚨 High Plagiarism</div>', unsafe_allow_html=True)
-                    
-                    with results_col2:
-                        ai_score = float(result.get('ai_detection_score', 0))
-                        st.metric(
-                            "🤖 AI Detection Score",
-                            f"{ai_score:.1f}%"
-                        )
-                        
-                        # AI indicator
-                        if ai_score < 30:
-                            st.markdown('<div style="background-color: #ccffcc; padding: 10px; border-radius: 5px; color: #00cc00; font-weight: bold;">✅ Likely Human</div>', unsafe_allow_html=True)
-                        elif ai_score < 70:
-                            st.markdown('<div style="background-color: #fff4cc; padding: 10px; border-radius: 5px; color: #cc8800; font-weight: bold;">⚠️ Possibly AI</div>', unsafe_allow_html=True)
-                        else:
-                            st.markdown('<div style="background-color: #ffcccc; padding: 10px; border-radius: 5px; color: #cc0000; font-weight: bold;">🤖 Likely AI</div>', unsafe_allow_html=True)
-                    
-                    with results_col3:
-                        matching_docs = int(result.get('similar_documents_count', 0))
-                        st.metric(
-                            "📚 Matching Sources",
-                            f"{matching_docs}"
-                        )
-                    
-                    # Detailed Analysis
-                    st.divider()
-                    st.header("📋 Detailed Analysis")
-                    
-                    # Display raw result
-                    st.json(result)
-                
-                else:
-                    st.error(f"❌ API Error: {response.status_code}")
-                    st.text(response.text)
+        try:
+            # Step 1: Get pre-signed URL from Lambda
+            st.info("🔗 Getting secure S3 upload URL...")
             
-            except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+            filename = uploaded_file.name
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            s3_key = f"submissions/{timestamp}_{filename}"
+            
+            presigned_response = requests.post(
+                PRESIGNED_URL_ENDPOINT,
+                json={"s3_key": s3_key, "filename": filename},
+                timeout=30
+            )
+            
+            if presigned_response.status_code != 200:
+                st.error(f"❌ Failed to get upload URL: {presigned_response.status_code}")
+                st.text(presigned_response.text)
+            else:
+                presigned_data = presigned_response.json()
+                presigned_url = presigned_data.get('url')
+                
+                if not presigned_url:
+                    st.error("❌ No upload URL received from server")
+                    st.json(presigned_data)
+                else:
+                    # Step 2: Upload file directly to S3 using pre-signed URL
+                    st.info("📤 Uploading document to S3...")
+                    
+                    files = {'file': (filename, uploaded_file.getvalue())}
+                    form_data = {k: v for k, v in presigned_data.items() if k != 'url'}
+                    form_data['file'] = (filename, uploaded_file.getvalue())
+                    
+                    upload_response = requests.post(
+                        presigned_url,
+                        data=form_data,
+                        timeout=60
+                    )
+                    
+                    if upload_response.status_code not in [200, 204]:
+                        st.error(f"❌ Upload failed: {upload_response.status_code}")
+                        st.text(upload_response.text)
+                    else:
+                        st.success(f"✅ Uploaded to S3: {s3_key}")
+                        
+                        # Step 3: Call Lambda to process the file
+                        st.info("🔍 Analyzing document via Lambda...")
+                        
+                        payload = {
+                            "s3_key": s3_key,
+                            "filename": filename
+                        }
+                        
+                        response = requests.post(
+                            API_ENDPOINT,
+                            json=payload,
+                            timeout=120,
+                            headers={"Content-Type": "application/json"}
+                        )
+                        
+                        if response.status_code == 200:
+                            result = response.json()
+                            
+                            # Check if body is a string that needs JSON parsing
+                            if isinstance(result.get('body'), str):
+                                result = json.loads(result['body'])
+                            
+                            # Display Results
+                            st.success("✅ Analysis Complete!")
+                            
+                            # Create result display
+                            results_col1, results_col2, results_col3 = st.columns(3)
+                            
+                            with results_col1:
+                                plagiarism_score = float(result.get('plagiarism_score', 0))
+                                st.metric(
+                                    "📊 Plagiarism Score",
+                                    f"{plagiarism_score:.1f}%"
+                                )
+                                
+                                # Color indicator
+                                if plagiarism_score < 20:
+                                    st.markdown('<div style="background-color: #ccffcc; padding: 10px; border-radius: 5px; color: #00cc00; font-weight: bold;">✅ Low Plagiarism</div>', unsafe_allow_html=True)
+                                elif plagiarism_score < 50:
+                                    st.markdown('<div style="background-color: #fff4cc; padding: 10px; border-radius: 5px; color: #cc8800; font-weight: bold;">⚠️ Medium Plagiarism</div>', unsafe_allow_html=True)
+                                else:
+                                    st.markdown('<div style="background-color: #ffcccc; padding: 10px; border-radius: 5px; color: #cc0000; font-weight: bold;">🚨 High Plagiarism</div>', unsafe_allow_html=True)
+                            
+                            with results_col2:
+                                ai_score = float(result.get('ai_detection_score', 0))
+                                st.metric(
+                                    "🤖 AI Detection Score",
+                                    f"{ai_score:.1f}%"
+                                )
+                                
+                                # AI indicator
+                                if ai_score < 30:
+                                    st.markdown('<div style="background-color: #ccffcc; padding: 10px; border-radius: 5px; color: #00cc00; font-weight: bold;">✅ Likely Human</div>', unsafe_allow_html=True)
+                                elif ai_score < 70:
+                                    st.markdown('<div style="background-color: #fff4cc; padding: 10px; border-radius: 5px; color: #cc8800; font-weight: bold;">⚠️ Possibly AI</div>', unsafe_allow_html=True)
+                                else:
+                                    st.markdown('<div style="background-color: #ffcccc; padding: 10px; border-radius: 5px; color: #cc0000; font-weight: bold;">🤖 Likely AI</div>', unsafe_allow_html=True)
+                            
+                            with results_col3:
+                                matching_docs = int(result.get('similar_documents_found', 0))
+                                st.metric(
+                                    "📚 Matching Sources",
+                                    f"{matching_docs}"
+                                )
+                            
+                            # Detailed Analysis
+                            st.divider()
+                            st.header("📋 Detailed Analysis")
+                            st.json(result)
+                        
+                        else:
+                            st.error(f"❌ API Error: {response.status_code}")
+                            st.text(response.text)
+        
+        except requests.exceptions.Timeout:
+            st.error("❌ Request timeout - analysis is taking too long")
+        except Exception as e:
+            st.error(f"❌ Error: {str(e)}")
 
 # Footer
 st.divider()

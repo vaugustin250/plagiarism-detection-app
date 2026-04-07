@@ -1,0 +1,14 @@
+# Use AWS Lambda Python 3.9 runtime image
+FROM public.ecr.aws/lambda/python:3.9
+
+# Copy requirements
+COPY requirements-lambda.txt ${LAMBDA_TASK_ROOT}/
+
+# Install Python dependencies
+RUN pip install --no-cache-dir -r ${LAMBDA_TASK_ROOT}/requirements-lambda.txt -t "${LAMBDA_TASK_ROOT}"
+
+# Copy Lambda handler code and rename it
+COPY 02_lambda_handler.py ${LAMBDA_TASK_ROOT}/lambda_function.py
+
+# Set the CMD to your handler
+CMD ["lambda_function.lambda_handler"]

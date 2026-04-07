@@ -1,0 +1,35 @@
+# Core AWS & Cloud Services
+boto3==1.26.137
+botocore==1.29.137
+
+# Database & Storage
+psycopg2-binary==2.9.6
+pinecone-client==2.2.3
+
+# Document Processing
+PyPDF2==3.0.1
+python-docx==0.8.11
+python-pptx==0.6.21
+
+# Machine Learning & Embeddings
+sentence-transformers==2.2.2
+huggingface-hub==0.14.1
+torch==2.0.1
+transformers==4.28.1
+
+# Web Framework (Streamlit Dashboard)
+streamlit==1.22.1
+streamlit-option-menu==0.3.2
+
+# Data Processing & Visualization
+pandas==2.0.0
+numpy==1.24.3
+plotly==5.14.0
+matplotlib==3.7.1
+scikit-learn==1.2.2
+
+# Utilities
+python-dotenv==1.0.0
+requests==2.31.0
+python-multipart==0.0.6
+Pillow==9.5.0
