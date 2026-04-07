@@ -1,14 +1,24 @@
 """
 Streamlit Web Dashboard - AI Plagiarism Detection
-Simple interface that calls Lambda API Gateway endpoint
+Uploads files to S3, then calls Lambda API Gateway endpoint
 """
 
 import streamlit as st
 import requests
+import boto3
+import json
 from datetime import datetime
+import os
 
 # API Configuration
 API_ENDPOINT = "https://uvwsd5vxgc.execute-api.us-east-2.amazonaws.com/prod/analyze"
+S3_BUCKET = "plagiarism-detection-docs-augustin"
+S3_REGION = "us-east-2"
+
+# AWS S3 Client
+@st.cache_resource
+def get_s3_client():
+    return boto3.client('s3', region_name=S3_REGION)
 
 # Configure Streamlit page
 st.set_page_config(
@@ -59,21 +69,33 @@ st.divider()
 # Analyze Button
 if uploaded_file:
     if st.button("🚀 Analyze Document", use_container_width=True):
-        with st.spinner("Processing document... This may take 30-60 seconds"):
+        with st.spinner("📤 Uploading to S3... then processing"):
             try:
-                # Read file content
-                file_content = uploaded_file.getvalue()
+                # Step 1: Upload file to S3
+                s3_key = f"submissions/{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uploaded_file.name}"
+                s3_client = get_s3_client()
                 
-                # Prepare request to Lambda API
-                files = {
-                    'file': (uploaded_file.name, file_content, uploaded_file.type)
+                st.info("📤 Uploading document to S3...")
+                s3_client.upload_fileobj(
+                    uploaded_file,
+                    S3_BUCKET,
+                    s3_key
+                )
+                st.success(f"✅ Uploaded to S3: {s3_key}")
+                
+                # Step 2: Call Lambda with S3 path (small request)
+                st.info("🔍 Analyzing document via Lambda...")
+                payload = {
+                    "s3_bucket": S3_BUCKET,
+                    "s3_key": s3_key,
+                    "filename": uploaded_file.name
                 }
                 
-                # Call Lambda via API Gateway
                 response = requests.post(
                     API_ENDPOINT,
-                    files=files,
-                    timeout=120
+                    json=payload,
+                    timeout=120,
+                    headers={"Content-Type": "application/json"}
                 )
                 
                 # Parse response
@@ -134,10 +156,6 @@ if uploaded_file:
                     st.error(f"❌ API Error: {response.status_code}")
                     st.text(response.text)
             
-            except requests.exceptions.Timeout:
-                st.error("⏱️ Request timeout. Processing took too long. Try again.")
-            except requests.exceptions.ConnectionError:
-                st.error("❌ Connection error. Check your internet.")
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
 
