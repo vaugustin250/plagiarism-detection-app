@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 Plagiarism Detection System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 20px;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 30px;
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .feature {
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .feature strong {
+            color: #333;
+            display: block;
+            margin-bottom: 3px;
+        }
+        
+        .upload-section {
+            margin-bottom: 30px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 10px;
+            color: #333;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        input[type="file"] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-input-label {
+            display: block;
+            padding: 15px;
+            background: #f0f0f0;
+            border: 2px dashed #667eea;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .file-input-label:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        input[type="file"]:focus + .file-input-label {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .file-name {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e8f0fe;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+            color: #333;
+            font-size: 13px;
+            display: none;
+        }
+        
+        .file-name.show {
+            display: block;
+        }
+        
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 20px;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .progress {
+            display: none;
+            margin-bottom: 20px;
+        }
+        
+        .progress.show {
+            display: block;
+        }
+        
+        .progress-text {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 8px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            animation: progress 2s ease-in-out infinite;
+        }
+        
+        @keyframes progress {
+            0%, 100% { width: 0%; }
+            50% { width: 100%; }
+        }
+        
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+        
+        .results.show {
+            display: block;
+        }
+        
+        .result-card {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .result-label {
+            color: #666;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        
+        .result-value {
+            font-size: 28px;
+            font-weight: 700;
+            color: #333;
+        }
+        
+        .result-indicator {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+        
+        .indicator-low {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        
+        .indicator-medium {
+            background: #ffe0b2;
+            color: #e65100;
+        }
+        
+        .indicator-high {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+        
+        .error {
+            background: #ffcdd2;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+        }
+        
+        .error.show {
+            display: block;
+        }
+        
+        .success {
+            background: #c8e6c9;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+        }
+        
+        .success.show {
+            display: block;
+        }
+        
+        .loading {
+            text-align: center;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+        
+        .json-output {
+            background: #1e1e1e;
+            color: #00ff00;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 11px;
+            overflow-x: auto;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Plagiarism Detection</h1>
+            <p class="subtitle">AI-powered document analysis powered by AWS Lambda</p>
+            
+            <div class="features">
+                <div class="feature">
+                    <strong>📊 Plagiarism</strong>
+                    87% Accuracy
+                </div>
+                <div class="feature">
+                    <strong>🤖 AI Detection</strong>
+                    81% Accuracy
+                </div>
+                <div class="feature">
+                    <strong>⚡ Speed</strong>
+                    30-60 seconds
+                </div>
+                <div class="feature">
+                    <strong>📁 Format</strong>
+                    PDF & DOCX
+                </div>
+            </div>
+        </header>
+        
+        <div class="error" id="error"></div>
+        <div class="success" id="success"></div>
+        
+        <div class="upload-section">
+            <label for="fileInput">📤 Select Document</label>
+            <div class="file-input-wrapper">
+                <input type="file" id="fileInput" accept=".pdf,.docx">
+                <label for="fileInput" class="file-input-label">
+                    📁 Click to select or drag & drop PDF/DOCX
+                </label>
+            </div>
+            <div class="file-name" id="fileName"></div>
+        </div>
+        
+        <button id="analyzeBtn" disabled>🚀 Analyze Document</button>
+        
+        <div class="progress" id="progress">
+            <div class="progress-text" id="progressText">Processing...</div>
+            <div class="progress-bar">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+        
+        <div class="results" id="results">
+            <div class="result-card">
+                <div class="result-header">
+                    <span class="result-label">📊 Plagiarism Score</span>
+                    <span class="result-value" id="plagiarismScore">0%</span>
+                </div>
+                <div id="plagiarismIndicator"></div>
+            </div>
+            
+            <div class="result-card">
+                <div class="result-header">
+                    <span class="result-label">🤖 AI Detection Score</span>
+                    <span class="result-value" id="aiScore">0%</span>
+                </div>
+                <div id="aiIndicator"></div>
+            </div>
+            
+            <div class="result-card">
+                <div class="result-header">
+                    <span class="result-label">📚 Matching Sources</span>
+                    <span class="result-value" id="matchingDocs">0</span>
+                </div>
+            </div>
+            
+            <div class="result-card">
+                <div class="result-label">📋 Full Response</div>
+                <div class="json-output" id="jsonOutput"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_ENDPOINT = 'https://uvwsd5vxgc.execute-api.us-east-2.amazonaws.com/prod/analyze';
+        const PRESIGNED_URL_ENDPOINT = 'https://uvwsd5vxgc.execute-api.us-east-2.amazonaws.com/prod/get-presigned-url';
+        const S3_BUCKET = 'plagiarism-detection-docs-augustin';
+        
+        const fileInput = document.getElementById('fileInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const fileName = document.getElementById('fileName');
+        const progress = document.getElementById('progress');
+        const results = document.getElementById('results');
+        const error = document.getElementById('error');
+        const success = document.getElementById('success');
+        
+        // File selection
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                fileName.textContent = `✅ Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                fileName.classList.add('show');
+                analyzeBtn.disabled = false;
+                error.classList.remove('show');
+            }
+        });
+        
+        // Analyze button
+        analyzeBtn.addEventListener('click', analyzeDocument);
+        
+        async function analyzeDocument() {
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            analyzeBtn.disabled = true;
+            progress.classList.add('show');
+            results.classList.remove('show');
+            error.classList.remove('show');
+            success.classList.remove('show');
+            
+            try {
+                const s3Key = `submissions/${Date.now()}_${file.name}`;
+                
+                // Step 1: Get presigned URL
+                updateProgress('🔗 Getting secure S3 upload URL...');
+                const presignedResponse = await fetch(PRESIGNED_URL_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ s3_key: s3Key, filename: file.name })
+                });
+                
+                if (!presignedResponse.ok) {
+                    throw new Error(`Failed to get presigned URL: ${presignedResponse.status}`);
+                }
+                
+                const presignedData = await presignedResponse.json();
+                const presignedUrl = presignedData.url;
+                
+                if (!presignedUrl) {
+                    throw new Error('No upload URL received');
+                }
+                
+                // Step 2: Upload to S3
+                updateProgress('📤 Uploading document to S3...');
+                const formData = new FormData();
+                
+                // Add fields from presigned response
+                if (presignedData.fields) {
+                    for (let [key, value] of Object.entries(presignedData.fields)) {
+                        formData.append(key, value);
+                    }
+                }
+                
+                formData.append('file', file);
+                
+                const uploadResponse = await fetch(presignedUrl, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (uploadResponse.status !== 204 && uploadResponse.status !== 200) {
+                    throw new Error(`S3 upload failed: ${uploadResponse.status}`);
+                }
+                
+                // Step 3: Call Lambda to analyze
+                updateProgress('🔍 Analyzing document via Lambda...');
+                const analysisPayload = {
+                    s3_key: s3Key,
+                    filename: file.name
+                };
+                
+                const analysisResponse = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(analysisPayload),
+                    timeout: 120000
+                });
+                
+                if (!analysisResponse.ok) {
+                    throw new Error(`Analysis failed: ${analysisResponse.status}`);
+                }
+                
+                let analysisData = await analysisResponse.json();
+                
+                // Handle wrapped response
+                if (analysisData.body && typeof analysisData.body === 'string') {
+                    analysisData = JSON.parse(analysisData.body);
+                }
+                
+                displayResults(analysisData);
+                progress.classList.remove('show');
+                success.classList.add('show');
+                success.textContent = '✅ Analysis Complete!';
+                
+            } catch (err) {
+                console.error('Error:', err);
+                error.classList.add('show');
+                error.textContent = `❌ Error: ${err.message}`;
+                progress.classList.remove('show');
+            } finally {
+                analyzeBtn.disabled = false;
+            }
+        }
+        
+        function updateProgress(text) {
+            document.getElementById('progressText').textContent = text;
+        }
+        
+        function displayResults(data) {
+            const plagiarism = parseFloat(data.plagiarism_score || 0);
+            const ai = parseFloat(data.ai_detection_score || 0);
+            const matching = parseInt(data.similar_documents_found || 0);
+            
+            document.getElementById('plagiarismScore').textContent = `${plagiarism.toFixed(1)}%`;
+            document.getElementById('aiScore').textContent = `${ai.toFixed(1)}%`;
+            document.getElementById('matchingDocs').textContent = matching;
+            
+            // Plagiarism indicator
+            let plagiarismClass = 'indicator-low';
+            if (plagiarism >= 50) plagiarismClass = 'indicator-high';
+            else if (plagiarism >= 20) plagiarismClass = 'indicator-medium';
+            
+            const plagiarismText = plagiarism < 20 ? '✅ Low' : plagiarism < 50 ? '⚠️ Medium' : '🚨 High';
+            document.getElementById('plagiarismIndicator').innerHTML = `<span class="result-indicator ${plagiarismClass}">${plagiarismText} Plagiarism</span>`;
+            
+            // AI indicator
+            let aiClass = 'indicator-low';
+            if (ai >= 70) aiClass = 'indicator-high';
+            else if (ai >= 30) aiClass = 'indicator-medium';
+            
+            const aiText = ai < 30 ? '✅ Likely Human' : ai < 70 ? '⚠️ Possibly AI' : '🤖 Likely AI';
+            document.getElementById('aiIndicator').innerHTML = `<span class="result-indicator ${aiClass}">${aiText}</span>`;
+            
+            // JSON output
+            document.getElementById('jsonOutput').textContent = JSON.stringify(data, null, 2);
+            
+            results.classList.add('show');
+        }
+    </script>
+</body>
+</html>
