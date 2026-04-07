@@ -15,10 +15,20 @@ API_ENDPOINT = "https://uvwsd5vxgc.execute-api.us-east-2.amazonaws.com/prod/anal
 S3_BUCKET = "plagiarism-detection-docs-augustin"
 S3_REGION = "us-east-2"
 
-# AWS S3 Client
+# AWS S3 Client with credentials from Streamlit Secrets
 @st.cache_resource
 def get_s3_client():
-    return boto3.client('s3', region_name=S3_REGION)
+    try:
+        # Try to use Streamlit Secrets (works on Streamlit Cloud)
+        return boto3.client(
+            's3',
+            region_name=S3_REGION,
+            aws_access_key_id=st.secrets.get("AWS_ACCESS_KEY_ID"),
+            aws_secret_access_key=st.secrets.get("AWS_SECRET_ACCESS_KEY")
+        )
+    except:
+        # Fall back to environment variables or IAM role
+        return boto3.client('s3', region_name=S3_REGION)
 
 # Configure Streamlit page
 st.set_page_config(
@@ -36,6 +46,24 @@ st.markdown("""
 - 🤖 AI Detection: 81% Accuracy  
 - ⚡ Fast Processing: 30-60 seconds
 """)
+
+st.divider()
+
+# Configuration Check
+if not st.secrets.get("AWS_ACCESS_KEY_ID"):
+    st.warning("""
+    ⚠️ **AWS Credentials Not Configured**
+    
+    To use this app, add your AWS credentials to Streamlit Secrets:
+    
+    1. Go to **Settings** → **Secrets**
+    2. Add these variables:
+       - `AWS_ACCESS_KEY_ID`
+       - `AWS_SECRET_ACCESS_KEY`
+       - `AWS_DEFAULT_REGION`
+    
+    📖 See `STREAMLIT_SECRETS_SETUP.md` for detailed instructions
+    """, icon="⚠️")
 
 st.divider()
 
